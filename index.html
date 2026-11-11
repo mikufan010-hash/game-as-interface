@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week Puzzle</title>
+<style>
+  :root { --cell: 46px; --grid: #1c1c1c; --red: #e8352b; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #000; color: #fff;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    user-select: none; -webkit-user-select: none;
+  }
+  header {
+    display: flex; align-items: center; gap: 24px;
+    padding: 16px 28px; border-bottom: 2px solid var(--red);
+  }
+  h1 { margin: 0; font-size: 34px; font-weight: 400; letter-spacing: 1px; flex: 1; }
+  .stat { font-size: 15px; color: #aaa; }
+  .stat b { display: block; font-size: 30px; font-weight: 400; color: #fff; }
+  #pauseBtn { font-size: 22px; width: 46px; padding: 4px 0; }
+  main { display: flex; gap: 44px; padding: 24px 28px 40px; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+
+  /* ---------- calendar ---------- */
+  .board-wrap { display: grid; grid-template-columns: 52px auto; grid-template-rows: 38px auto; }
+  .days { grid-column: 2; display: grid; grid-template-columns: repeat(7, var(--cell)); }
+  .days div { position: relative; text-align: center; font-size: 13px; color: #888; line-height: 30px; }
+  .days .today { color: #fff; font-weight: bold; }
+  .days .bar { position: absolute; left: 3px; right: 3px; bottom: 2px; height: 4px; background: #333; }
+  .days .bar i { display: block; height: 100%; width: 100%; background: var(--red); }
+  .hours { grid-row: 2; display: grid; grid-template-rows: repeat(10, var(--cell)); }
+  .hours div { font-size: 12px; color: #777; text-align: right; padding-right: 8px; transform: translateY(-7px); }
+  #board {
+    position: relative; grid-row: 2; grid-column: 2; overflow: hidden;
+    width: calc(var(--cell) * 7 + 1px); height: calc(var(--cell) * 10 + 1px);
+    background-color: #000;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: var(--cell) var(--cell);
+    border: 1px solid #333; touch-action: none;
+  }
+  .today-col { position: absolute; left: 0; top: 0; width: var(--cell); height: 100%; background: rgba(255,255,255,.06); }
+  #board.flash .today-col { animation: flash .4s ease; }
+  @keyframes flash { from { background: rgba(255,255,255,.5); } to { background: rgba(255,255,255,.06); } }
+
+  /* ---------- blocks ---------- */
+  .cell { position: absolute; width: var(--cell); height: var(--cell); }
+  .cell .label {
+    position: absolute; left: 4px; top: 4px; max-width: calc(var(--cell) * 2 - 8px);
+    overflow: hidden; text-overflow: ellipsis;
+    font-size: 11px; line-height: 1.2; color: #000; white-space: nowrap; pointer-events: none; z-index: 2;
+  }
+  .preview { opacity: .4; }
+  .preview.bad { background: var(--red) !important; }
+  .piece { position: relative; }
+  .float { position: fixed; pointer-events: none; z-index: 100; opacity: .9; }
+
+  /* ---------- incoming tasks ---------- */
+  .panel { width: 420px; max-width: 100%; }
+  .panel h2 { font-size: 15px; font-weight: 400; color: #aaa; margin: 0 0 10px; display: flex; justify-content: space-between; }
+  .panel h2.full { color: var(--red); }
+  #queue { display: flex; gap: 14px; touch-action: none; }
+  .slot {
+    width: calc(var(--cell) * 3); min-height: calc(var(--cell) * 4 + 44px);
+    border: 1px dashed #333; padding: 8px 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px;
+  }
+  .slot.empty::after { content: "—"; color: #333; margin: auto; }
+  .slot .piece { cursor: grab; }
+  .slot .name { font-size: 13px; text-align: center; max-width: 100%; padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .slot small { font-size: 11px; color: #777; margin-top: -4px; }
+  .next { height: 3px; background: #222; margin-top: 12px; }
+  .next i { display: block; height: 100%; width: 0; background: #fff; }
+
+  .hint { font-size: 13px; color: #888; line-height: 1.8; margin: 18px 0; }
+  kbd { border: 1px solid #555; padding: 0 5px; font-size: 12px; font-family: inherit; }
+  button {
+    font: inherit; font-size: 15px; padding: 8px 18px;
+    border: 2px solid #fff; background: #000; color: #fff; cursor: pointer;
+  }
+  button:hover { background: #fff; color: #000; }
+
+  /* ---------- overlay screens ---------- */
+  #overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.92); z-index: 200;
+    display: flex; padding: 24px; overflow-y: auto;
+  }
+  #overlay.hidden { display: none; }
+  .screen { width: 460px; max-width: 100%; margin: auto; }
+  .screen h2 { font-size: 42px; font-weight: 400; margin: 0 0 12px; }
+  .screen p { color: #bbb; font-size: 15px; line-height: 1.6; margin: 0 0 16px; }
+  .screen textarea {
+    width: 100%; height: 120px; font: inherit; font-size: 15px; line-height: 1.6;
+    color: #fff; background: #000; border: 1px solid #555; padding: 10px 12px; resize: vertical;
+    user-select: text; -webkit-user-select: text;
+  }
+  .screen textarea:focus { outline: none; border-color: #fff; }
+  .screen .buttons { display: flex; gap: 12px; margin-top: 16px; }
+  .screen ul { list-style: none; padding: 0; margin: 0 0 8px; max-height: 260px; overflow: auto; font-size: 14px; line-height: 1.9; }
+  .screen ul b { display: inline-block; width: 46px; font-weight: 400; color: #888; }
+  .screen .dot { display: inline-block; width: 10px; height: 10px; margin: 0 4px 0 8px; }
+
+  /* ---------- fixed commitments (busy time) ---------- */
+  .busy, .cal-block.busy, .ed-cell.on {
+    background: repeating-linear-gradient(45deg, #3a3a3a, #3a3a3a 6px, #2c2c2c 6px, #2c2c2c 12px);
+  }
+  .busy .label, .cal-block.busy { color: #bbb; }
+  .screen h3 { font-size: 15px; font-weight: 400; color: #fff; margin: 22px 0 6px; }
+  .screen .small { font-size: 13px; color: #888; margin: 0 0 10px; }
+  .ed-tools { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; font-size: 13px; color: #aaa; }
+  .ed-tools input {
+    font: inherit; font-size: 14px; width: 140px; color: #fff; background: #000;
+    border: none; border-bottom: 1px solid #555; padding: 4px 2px;
+    user-select: text; -webkit-user-select: text;
+  }
+  .ed-tools input:focus { outline: none; border-bottom-color: #fff; }
+  .ed-tools button { font-size: 12px; padding: 4px 10px; border-width: 1px; margin-left: auto; }
+  .editor { display: grid; grid-template-columns: 44px repeat(7, 36px); touch-action: none; cursor: crosshair; }
+  .editor .eh { font-size: 11px; color: #888; text-align: center; padding-bottom: 4px; }
+  .editor .er { font-size: 11px; color: #666; text-align: right; padding-right: 6px; line-height: 26px; }
+  .ed-cell {
+    height: 26px; border-right: 1px solid #1c1c1c; border-bottom: 1px solid #1c1c1c;
+    font-size: 9px; color: #bbb; padding: 2px 3px; overflow: hidden; white-space: nowrap;
+  }
+  .ed-cell:hover { outline: 1px solid #fff; outline-offset: -1px; }
+
+  /* ---------- calendar view ---------- */
+  .screen.wide { width: auto; max-width: 95vw; }
+  .cal-scroll { overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; }
+  .cal { display: grid; grid-template-columns: 52px auto; }
+  .cal-head { grid-column: 2; display: flex; }
+  .cal-head div { width: 96px; flex: none; text-align: center; font-size: 13px; line-height: 1.4; padding-bottom: 8px; color: #888; }
+  .cal-head .today { color: #fff; font-weight: bold; }
+  .cal-head small { display: block; font-size: 11px; font-weight: 400; }
+  .cal-head .past small { color: #75f47a; }
+  .cal-hours { display: grid; grid-template-rows: repeat(10, 40px); }
+  .cal-hours div { font-size: 12px; color: #777; text-align: right; padding-right: 8px; transform: translateY(-7px); }
+  .cal-body { display: flex; border-left: 1px solid #333; }
+  .cal-col {
+    position: relative; width: 96px; height: 400px; flex: none; border-right: 1px solid #333;
+    background-image: linear-gradient(#1c1c1c 1px, transparent 1px); background-size: 100% 40px;
+  }
+  .cal-col.past .cal-block { opacity: .45; }
+  .cal-col.today { background-color: rgba(255,255,255,.06); }
+  .cal-block {
+    position: absolute; left: 2px; right: 2px; padding: 4px 6px; color: #000;
+    font-size: 12px; line-height: 1.3; overflow: hidden;
+  }
+  .cal-block small { display: block; font-size: 10px; opacity: .7; }
+  .cal-legend { font-size: 13px; color: #888; margin: 0 0 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>WEEK PUZZLE</h1>
+  <div class="stat">Day<b id="dayStat">1</b></div>
+  <div class="stat">Hours done<b id="scoreStat">0</b></div>
+  <button id="calBtn" title="See your schedule (C)">Calendar</button>
+  <button id="pauseBtn" title="Pause (P)">❚❚</button>
+</header>
+
+<main>
+  <div class="board-wrap">
+    <div class="days" id="days"></div>
+    <div class="hours" id="hours"></div>
+    <div id="board"></div>
+  </div>
+
+  <div class="panel">
+    <h2 id="queueTitle"><span>Incoming tasks</span><span id="queueCount"></span></h2>
+    <div id="queue"></div>
+    <div class="next"><i id="nextBar"></i></div>
+    <div class="hint">
+      Drag tasks onto the calendar before too many pile up.<br>
+      Press <kbd>R</kbd> or scroll while dragging to rotate · Double-click to rotate.<br>
+      Once placed, a task is locked in. When today ends, its tasks count as done.<br>
+      If a 4th task arrives while 3 are waiting, you're overwhelmed.
+    </div>
+  </div>
+</main>
+
+<div id="overlay"></div>
+
+<script>
+// ================== settings ==================
+const CELL = 46;
+const COLS = 7;              // days visible
+const ROWS = 10;             // 9:00 - 19:00
+const START_HOUR = 9;
+const QUEUE_MAX = 3;
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const TODAY = new Date().getDay();
+document.documentElement.style.setProperty('--cell', CELL + 'px');
+
+const COLORS = ['#5bc0f8', '#ee9a3a', '#f9e05e', '#e04cf5', '#75f47a', '#ec3a73', '#4a7bf7'];
+// shapes: [column (day), row (hour)]. Vertical = hours in a row on one day.
+const SHAPES = [
+  [[0,0]],
+  [[0,0],[0,1]],
+  [[0,0],[0,1],[0,2]],
+  [[0,0],[0,1],[1,1]],
+  [[0,0],[0,1],[0,2],[0,3]],
+  [[0,0],[0,1],[0,2],[1,2]],
+  [[0,0],[1,0],[0,1],[1,1]],
+  [[0,0],[1,0],[2,0],[1,1]],
+  [[0,0],[0,1],[1,1],[1,2]],
+];
+const DEFAULT_TASKS = ['Essay', 'Gym', 'Reading', 'Group meeting', 'Laundry', 'Call home', 'Project', 'Groceries', 'Email prof', 'Studio time'];
+
+// ================== state ==================
+let taskNames = [];
+let mode = 'start';          // start | play | pause | over
+let firstDay, cells, history, queue, score, log, nextId, namePool;
+let calReturn = null;        // where to go when the calendar closes
+
+// Fixed weekly commitments: "weekday,row" -> label. weekday: 0 = Sun ... 6 = Sat.
+// They repeat every week, so a Tuesday class blocks every Tuesday in the game.
+let busy = {};
+const busyAt = (day, row) => busy[((TODAY + day) % 7) + ',' + row];
+
+// remember tasks + commitments between visits (if the browser allows it)
+try {
+  const saved = JSON.parse(localStorage.getItem('weekPuzzle') || 'null');
+  if (saved) { taskNames = saved.taskNames || []; busy = saved.busy || {}; }
+} catch (e) {}
+function save() {
+  try { localStorage.setItem('weekPuzzle', JSON.stringify({ taskNames, busy })); } catch (e) {}
+}
+let dayTimer, dayLen, spawnTimer, spawnLen;
+let drag = null;
+let lastPointer = { x: 0, y: 0 };
+
+const dayName = d => WEEKDAYS[(TODAY + d) % 7];
+const rand = arr => arr[Math.floor(Math.random() * arr.length)];
+
+function newGame() {
+  firstDay = 0;
+  cells = new Map();         // "day,row" -> { id, name, color, label }  (what's still on the board)
+  history = new Map();       // same, but never cleared — used by the calendar view
+  queue = [];
+  score = 0;
+  log = [];
+  nextId = 1;
+  namePool = [];
+  dayTimer = 0; dayLen = 16000;
+  spawnTimer = 0; spawnLen = 5500;
+  queue.push(newTask(), newTask());
+  mode = 'play';
+  hideOverlay();
+  render();
+}
+
+function newTask() {
+  if (!namePool.length) namePool = [...taskNames].sort(() => Math.random() - .5);
+  const shape = rand(SHAPES).map(p => [...p]);
+  return { id: nextId++, name: namePool.pop(), color: COLORS[(nextId - 2) % COLORS.length], shape };
+}
+
+// ================== game loop ==================
+let lastTime = performance.now();
+function loop(now) {
+  const dt = now - lastTime;
+  lastTime = now;
+  if (mode === 'play') {
+    dayTimer += dt;
+    spawnTimer += dt;
+    if (dayTimer >= dayLen) passDay();
+    if (spawnTimer >= spawnLen) spawn();
+  }
+  const bar = document.getElementById('todayBar');
+  if (bar) bar.style.width = Math.max(0, 1 - dayTimer / dayLen) * 100 + '%';
+  document.getElementById('nextBar').style.width =
+    (mode === 'start' ? 0 : Math.min(1, spawnTimer / spawnLen) * 100) + '%';
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+function passDay() {
+  // everything placed today counts as done
+  const done = {};
+  for (let r = 0; r < ROWS; r++) {
+    const key = firstDay + ',' + r;
+    const c = cells.get(key);
+    if (c) {
+      score++;
+      done[c.name] = done[c.name] || { hours: 0, color: c.color };
+      done[c.name].hours++;
+      cells.delete(key);
+    }
+  }
+  log.push({ day: firstDay, tasks: done });
+  firstDay++;
+  dayTimer = 0;
+  dayLen = Math.max(7000, dayLen * 0.93);      // days get shorter
+  spawnLen = Math.max(2600, spawnLen * 0.95);  // tasks come faster
+  render();
+  const b = document.getElementById('board');
+  b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash');
+}
+
+function spawn() {
+  spawnTimer = 0;
+  if (queue.length >= QUEUE_MAX) return gameOver();
+  queue.push(newTask());
+  render();
+}
+
+// ================== helpers ==================
+const size = shape => ({
+  w: Math.max(...shape.map(p => p[0])) + 1,
+  h: Math.max(...shape.map(p => p[1])) + 1,
+});
+
+function rotate(shape, grab) {
+  const { h } = size(shape);
+  const turn = ([c, r]) => [h - 1 - r, c];
+  return { shape: shape.map(turn), grab: grab ? turn(grab) : null };
+}
+
+function canPlace(shape, c0, r0) {
+  return shape.every(([c, r]) => {
+    const x = c + c0, y = r + r0;
+    return x >= 0 && x < COLS && y >= 0 && y < ROWS
+      && !cells.has((firstDay + x) + ',' + y) && !busyAt(firstDay + x, y);
+  });
+}
+
+function makeCell(c, r, color, label, extraClass) {
+  const el = document.createElement('div');
+  el.className = 'cell ' + (extraClass || '');
+  el.style.left = c * CELL + 'px';
+  el.style.top = r * CELL + 'px';
+  if (color) el.style.background = color;
+  if (label) {
+    const s = document.createElement('span');
+    s.className = 'label';
+    s.textContent = label;
+    el.appendChild(s);
+  }
+  return el;
+}
+
+function makePieceEl(task, shape) {
+  const { w, h } = size(shape);
+  const el = document.createElement('div');
+  el.className = 'piece';
+  el.style.width = w * CELL + 'px';
+  el.style.height = h * CELL + 'px';
+  shape.forEach(([c, r]) => el.appendChild(makeCell(c, r, task.color)));
+  return el;
+}
+
+const firstCell = shape => [...shape].sort((a, b) => a[1] - b[1] || a[0] - b[0])[0];
+
+// ================== render ==================
+const board = document.getElementById('board');
+const queueEl = document.getElementById('queue');
+let previewLayer;
+
+function render() {
+  document.getElementById('days').innerHTML = Array.from({ length: COLS }, (_, i) =>
+    i === 0
+      ? `<div class="today">${dayName(firstDay)}<span class="bar"><i id="todayBar"></i></span></div>`
+      : `<div>${dayName(firstDay + i)}</div>`
+  ).join('');
+  document.getElementById('dayStat').textContent = firstDay + 1;
+  document.getElementById('scoreStat').textContent = score;
+
+  board.innerHTML = '<div class="today-col"></div>';
+  for (let col = 0; col < COLS; col++) {
+    for (let r = 0; r < ROWS; r++) {
+      const b = busyAt(firstDay + col, r);
+      if (!b) continue;
+      const startsRun = r === 0 || busyAt(firstDay + col, r - 1) !== b;
+      board.appendChild(makeCell(col, r, null, startsRun ? b : '', 'busy'));
+    }
+  }
+  cells.forEach((c, key) => {
+    const [d, r] = key.split(',').map(Number);
+    board.appendChild(makeCell(d - firstDay, r, c.color, c.label));
+  });
+  previewLayer = document.createElement('div');
+  board.appendChild(previewLayer);
+  renderPreview();
+
+  queueEl.innerHTML = '';
+  for (let i = 0; i < QUEUE_MAX; i++) {
+    const t = queue[i];
+    const slot = document.createElement('div');
+    slot.className = 'slot';
+    if (!t || (drag && drag.task === t)) {
+      slot.classList.add('empty');
+    } else {
+      const pe = makePieceEl(t, t.shape);
+      pe.addEventListener('pointerdown', e => {
+        const rect = pe.getBoundingClientRect();
+        startDrag(t, e, [Math.floor((e.clientX - rect.left) / CELL), Math.floor((e.clientY - rect.top) / CELL)]);
+      });
+      pe.addEventListener('dblclick', () => { t.shape = rotate(t.shape).shape; render(); });
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = t.name;
+      const hrs = document.createElement('small');
+      hrs.textContent = t.shape.length + (t.shape.length === 1 ? ' hour' : ' hours');
+      slot.append(pe, name, hrs);
+    }
+    queueEl.appendChild(slot);
+  }
+  const full = queue.length >= QUEUE_MAX;
+  document.getElementById('queueTitle').classList.toggle('full', full);
+  document.getElementById('queueCount').textContent = full ? 'FULL — place one!' : `${queue.length} / ${QUEUE_MAX}`;
+}
+
+function renderPreview() {
+  if (!previewLayer) return;
+  previewLayer.innerHTML = '';
+  if (!drag || !drag.target) return;
+  const { c0, r0, ok } = drag.target;
+  drag.shape.forEach(([c, r]) => {
+    const x = c + c0, y = r + r0;
+    if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return;
+    previewLayer.appendChild(makeCell(x, y, drag.task.color, '', 'preview' + (ok ? '' : ' bad')));
+  });
+}
+
+// ================== dragging ==================
+function startDrag(task, e, grab) {
+  if (mode !== 'play') return;
+  e.preventDefault();
+  drag = { task, shape: task.shape.map(p => [...p]), grab, float: null, target: null };
+  buildFloat();
+  render();
+  moveDrag(e.clientX, e.clientY);
+}
+
+function buildFloat() {
+  if (drag.float) drag.float.remove();
+  drag.float = makePieceEl(drag.task, drag.shape);
+  drag.float.classList.add('float');
+  document.body.appendChild(drag.float);
+}
+
+function moveDrag(x, y) {
+  lastPointer = { x, y };
+  if (!drag) return;
+  const [gc, gr] = drag.grab;
+  drag.float.style.left = x - (gc + 0.5) * CELL + 'px';
+  drag.float.style.top = y - (gr + 0.5) * CELL + 'px';
+  const rect = board.getBoundingClientRect();
+  if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+    const c0 = Math.floor((x - rect.left) / CELL) - gc;
+    const r0 = Math.floor((y - rect.top) / CELL) - gr;
+    drag.target = { c0, r0, ok: canPlace(drag.shape, c0, r0) };
+  } else {
+    drag.target = null;
+  }
+  renderPreview();
+}
+
+function rotateDrag() {
+  if (!drag) return;
+  const r = rotate(drag.shape, drag.grab);
+  drag.shape = r.shape;
+  drag.grab = r.grab;
+  buildFloat();
+  moveDrag(lastPointer.x, lastPointer.y);
+}
+
+function endDrag() {
+  if (!drag) return;
+  const { task, target } = drag;
+  // re-check: the day may have moved while dragging
+  if (mode === 'play' && target && canPlace(drag.shape, target.c0, target.r0)) {
+    const fc = firstCell(drag.shape);
+    drag.shape.forEach(([c, r]) => {
+      const key = (firstDay + c + target.c0) + ',' + (r + target.r0);
+      const data = {
+        id: task.id, name: task.name, color: task.color,
+        label: c === fc[0] && r === fc[1] ? task.name : '',
+      };
+      cells.set(key, data);
+      history.set(key, data);
+    });
+    queue = queue.filter(t => t !== task);
+  } else {
+    task.shape = drag.shape;   // back to the queue, keep rotation
+  }
+  cancelDrag();
+}
+
+function cancelDrag() {
+  if (!drag) return;
+  drag.float.remove();
+  drag = null;
+  render();
+}
+
+window.addEventListener('pointermove', e => moveDrag(e.clientX, e.clientY));
+window.addEventListener('pointerup', endDrag);
+window.addEventListener('keydown', e => {
+  if ((e.key === 'r' || e.key === 'R' || e.key === ' ') && drag) { e.preventDefault(); rotateDrag(); }
+  if (mode === 'calendar' && (e.key === 'Escape' || e.key === 'c' || e.key === 'C')) return closeCalendar();
+  if ((e.key === 'c' || e.key === 'C') && (mode === 'play' || mode === 'pause')) return openCalendar();
+  if ((e.key === 'p' || e.key === 'P' || e.key === 'Escape') && (mode === 'play' || mode === 'pause')) togglePause();
+});
+document.getElementById('calBtn').addEventListener('click', () => {
+  if (mode === 'calendar') closeCalendar();
+  else if (mode === 'play' || mode === 'pause' || mode === 'over') openCalendar();
+});
+window.addEventListener('wheel', e => { if (drag) { e.preventDefault(); rotateDrag(); } }, { passive: false });
+document.getElementById('pauseBtn').addEventListener('click', togglePause);
+
+// ================== screens ==================
+const overlay = document.getElementById('overlay');
+function hideOverlay() { overlay.classList.add('hidden'); overlay.innerHTML = ''; }
+function showOverlay(html) { overlay.innerHTML = '<div class="screen">' + html + '</div>'; overlay.classList.remove('hidden'); }
+
+function showStart() {
+  mode = 'start';
+  showOverlay(`
+    <h2>WEEK PUZZLE</h2>
+    <p>What's on your plate this week? One task per line.<br>
+    They'll keep coming at you. Fit them into your days before they pile up.</p>
+    <textarea id="taskInput" placeholder="${DEFAULT_TASKS.slice(0, 5).join('\n')}">${escapeHtml(taskNames.join('\n'))}</textarea>
+
+    <h3>Time that's already taken</h3>
+    <p class="small">Classes, work, anything fixed. Click or drag to paint, click again to erase. Repeats every week.</p>
+    <div class="ed-tools">
+      <span>Label</span><input id="busyLabel" value="Class" maxlength="14">
+      <button id="clearBusy">Clear all</button>
+    </div>
+    <div class="editor" id="editor"></div>
+
+    <div class="buttons"><button id="startBtn">Start</button></div>
+  `);
+  buildEditor();
+  document.getElementById('clearBusy').onclick = () => { busy = {}; refreshEditor(); };
+  document.getElementById('startBtn').onclick = () => {
+    const lines = document.getElementById('taskInput').value.split('\n').map(s => s.trim()).filter(Boolean);
+    taskNames = lines.length ? lines : DEFAULT_TASKS;
+    save();
+    newGame();
+  };
+}
+
+// ---------- weekly "already taken" editor ----------
+const ED_DAYS = [1, 2, 3, 4, 5, 6, 0];   // Mon ... Sun (weekday numbers)
+let painting = null;                    // 'paint' | 'erase' | null
+
+function buildEditor() {
+  const ed = document.getElementById('editor');
+  let html = '<div></div>' + ED_DAYS.map(w => `<div class="eh">${WEEKDAYS[w]}</div>`).join('');
+  for (let r = 0; r < ROWS; r++) {
+    html += `<div class="er">${START_HOUR + r}:00</div>`;
+    html += ED_DAYS.map(w => `<div class="ed-cell" data-w="${w}" data-r="${r}"></div>`).join('');
+  }
+  ed.innerHTML = html;
+
+  const apply = target => {
+    if (!target || !target.dataset || target.dataset.w === undefined) return;
+    const key = target.dataset.w + ',' + target.dataset.r;
+    const label = document.getElementById('busyLabel').value.trim() || 'Busy';
+    if (painting === 'paint') busy[key] = label;
+    else delete busy[key];
+    refreshEditor();
+  };
+  ed.addEventListener('pointerdown', e => {
+    const t = e.target;
+    if (!t.dataset || t.dataset.w === undefined) return;
+    e.preventDefault();
+    painting = busy[t.dataset.w + ',' + t.dataset.r] ? 'erase' : 'paint';
+    apply(t);
+  });
+  ed.addEventListener('pointermove', e => {
+    if (!painting) return;
+    apply(document.elementFromPoint(e.clientX, e.clientY));
+  });
+  refreshEditor();
+}
+
+function refreshEditor() {
+  document.querySelectorAll('#editor .ed-cell').forEach(el => {
+    const w = +el.dataset.w, r = +el.dataset.r;
+    const b = busy[w + ',' + r];
+    el.classList.toggle('on', !!b);
+    el.textContent = b && busy[w + ',' + (r - 1)] !== b ? b : '';
+    el.title = b || '';
+  });
+}
+window.addEventListener('pointerup', () => { painting = null; });
+
+function togglePause() {
+  if (mode === 'play') {
+    cancelDrag();
+    mode = 'pause';
+    showOverlay(`<h2>PAUSED</h2><p>Take a breath.</p><div class="buttons"><button id="resumeBtn">Resume</button></div>`);
+    document.getElementById('resumeBtn').onclick = togglePause;
+  } else if (mode === 'pause') {
+    mode = 'play';
+    hideOverlay();
+  }
+}
+
+function gameOver() {
+  cancelDrag();
+  mode = 'over';
+  const days = log.filter(d => Object.keys(d.tasks).length);
+  const list = days.length
+    ? '<ul>' + days.map(d => '<li><b>' + dayName(d.day) + '</b>' +
+        Object.entries(d.tasks).map(([n, t]) =>
+          `<span class="dot" style="background:${t.color}"></span>${escapeHtml(n)} (${t.hours}h)`).join('') +
+      '</li>').join('') + '</ul>'
+    : '<p>Nothing got done.</p>';
+  showOverlay(`
+    <h2>OVERWHELMED.</h2>
+    <p>You made it ${firstDay} day${firstDay === 1 ? '' : 's'} and finished ${score} hour${score === 1 ? '' : 's'} of work.</p>
+    ${list}
+    <div class="buttons"><button id="againBtn">Try again</button><button id="calOverBtn">View calendar</button><button id="editBtn">Edit tasks</button></div>
+  `);
+  document.getElementById('againBtn').onclick = newGame;
+  document.getElementById('calOverBtn').onclick = openCalendar;
+  document.getElementById('editBtn').onclick = showStart;
+}
+
+// ================== calendar view ==================
+function openCalendar() {
+  cancelDrag();
+  calReturn = mode;          // 'play' | 'pause' | 'over'
+  mode = 'calendar';         // the game is frozen while you look
+
+  let lastDay = firstDay + COLS - 1;
+  history.forEach((_, key) => { lastDay = Math.max(lastDay, +key.split(',')[0]); });
+
+  const H = 40;              // pixels per hour in this view
+  let head = '', body = '';
+  for (let d = 0; d <= lastDay; d++) {
+    const when = d < firstDay ? 'past' : d === firstDay ? 'today' : '';
+    const tag = when === 'past' ? 'done ✓' : when === 'today' ? 'today' : 'Day ' + (d + 1);
+    head += `<div class="${when}">${dayName(d)}<small>${tag}</small></div>`;
+
+    // merge consecutive hours of the same task into one block
+    let blocks = '';
+    for (let r = 0; r < ROWS; ) {
+      const c = history.get(d + ',' + r);
+      const b = busyAt(d, r);
+      if (!c && b) {           // fixed commitment, e.g. a class
+        let end = r + 1;
+        while (end < ROWS && busyAt(d, end) === b) end++;
+        blocks += `<div class="cal-block busy" style="top:${r * H + 1}px;height:${(end - r) * H - 2}px">
+          ${escapeHtml(b)}<small>${START_HOUR + r}:00–${START_HOUR + end}:00</small></div>`;
+        r = end;
+        continue;
+      }
+      if (!c) { r++; continue; }
+      let end = r + 1;
+      while (end < ROWS && history.get(d + ',' + end) && history.get(d + ',' + end).id === c.id) end++;
+      blocks += `<div class="cal-block" style="top:${r * H + 1}px;height:${(end - r) * H - 2}px;background:${c.color}">
+        ${escapeHtml(c.name)}<small>${START_HOUR + r}:00–${START_HOUR + end}:00</small></div>`;
+      r = end;
+    }
+    body += `<div class="cal-col ${when}">${blocks}</div>`;
+  }
+
+  const hours = Array.from({ length: ROWS }, (_, i) => `<div>${START_HOUR + i}:00</div>`).join('');
+  showOverlay(`
+    <h2>YOUR SCHEDULE</h2>
+    <p class="cal-legend">Faded = already done · Highlighted = today · The game is paused while you look.</p>
+    <div class="cal-scroll">
+      <div class="cal">
+        <div class="cal-head">${head}</div>
+        <div class="cal-hours">${hours}</div>
+        <div class="cal-body">${body}</div>
+      </div>
+    </div>
+    <div class="buttons"><button id="calClose">${calReturn === 'over' ? 'Back' : 'Back to game'}</button></div>
+  `);
+  overlay.querySelector('.screen').classList.add('wide');
+  document.getElementById('calClose').onclick = closeCalendar;
+  // scroll so today is in view
+  const scroller = overlay.querySelector('.cal-scroll');
+  scroller.scrollLeft = Math.max(0, (firstDay - 1) * 96);
+}
+
+function closeCalendar() {
+  if (mode !== 'calendar') return;
+  if (calReturn === 'over') { gameOver(); return; }
+  mode = 'play';
+  hideOverlay();
+  if (calReturn === 'pause') togglePause();
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+// ================== init ==================
+document.getElementById('hours').innerHTML =
+  Array.from({ length: ROWS }, (_, i) => `<div>${START_HOUR + i}:00</div>`).join('');
+firstDay = 0; cells = new Map(); queue = []; score = 0; dayTimer = 0; dayLen = 1; spawnTimer = 0; spawnLen = 1;
+render();
+showStart();
+</script>
+</body>
+</html>
