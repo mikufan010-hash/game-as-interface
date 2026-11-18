@@ -756,7 +756,7 @@ function showOverlay(html) { overlay.innerHTML = '<div class="screen">' + html +
 function showStart() {
   mode = 'start';
   showOverlay(`
-    <h2>plan this week</h2>
+    <h2>plan your week</h2>
     <p>what are your plans for this week </p>
     <textarea id="taskInput" placeholder="${DEFAULT_TASKS.slice(0, 5).join('\n')}">${escapeHtml(taskNames.join('\n'))}</textarea>
 
