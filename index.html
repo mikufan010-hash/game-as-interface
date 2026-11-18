@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>To do list</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
 <style>
   :root { --cell: 46px; --grid: #1c1c1c; --red: #e8352b; }
   * { box-sizing: border-box; }
@@ -188,6 +191,13 @@
   }
   .cal-block small { display: block; font-size: 10px; opacity: .7; }
   .cal-legend { font-size: 13px; color: #888; margin: 0 0 12px; }
+
+  /* ---------- font: Bricolage Grotesque ---------- */
+  body, button, input, textarea { font-family: "Bricolage Grotesque", "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  h1, .screen h2, .title-ui h1 { font-weight: 800; letter-spacing: -.035em; }
+  .title-ui h1 { letter-spacing: -.045em; line-height: .82; }
+  .popup { font-weight: 800; letter-spacing: -.02em; }
+  .cell .label, .cal-block { font-weight: 600; }
 </style>
 </head>
 <body>
@@ -731,7 +741,7 @@ function showOverlay(html) { overlay.innerHTML = '<div class="screen">' + html +
 function showStart() {
   mode = 'start';
   showOverlay(`
-    <h2>plan this week</h2>/
+    <h2>plan your week</h2>/
     <p>what are your plans for this week </p>
     <textarea id="taskInput" placeholder="${DEFAULT_TASKS.slice(0, 5).join('\n')}">${escapeHtml(taskNames.join('\n'))}</textarea>
 
