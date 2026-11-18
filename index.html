@@ -12,7 +12,7 @@
   * { box-sizing: border-box; }
   body {
     margin: 0; background: #000; color: #fff;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: "Bricolage Grotesque", "Helvetica Neue", Helvetica, Arial, sans-serif;
     user-select: none; -webkit-user-select: none;
   }
   header {
@@ -157,7 +157,8 @@
     user-select: text; -webkit-user-select: text;
   }
   .ed-tools input:focus { outline: none; border-bottom-color: #fff; }
-  .ed-tools button { font-size: 12px; padding: 4px 10px; border-width: 1px; margin-left: auto; }
+  .ed-tools button { font-size: 12px; padding: 4px 10px; border-width: 1px; }
+  #exampleBtn { margin-left: auto; }
   .editor { display: grid; grid-template-columns: 44px repeat(7, 36px); touch-action: none; cursor: crosshair; }
   .editor .eh { font-size: 11px; color: #888; text-align: center; padding-bottom: 4px; }
   .editor .er { font-size: 11px; color: #666; text-align: right; padding-right: 6px; line-height: 26px; }
@@ -193,7 +194,7 @@
   .cal-legend { font-size: 13px; color: #888; margin: 0 0 12px; }
 
   /* ---------- font: Bricolage Grotesque ---------- */
-  body, button, input, textarea { font-family: "Bricolage Grotesque", "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  body, button, input, textarea, select, kbd { font-family: "Bricolage Grotesque", "Helvetica Neue", Helvetica, Arial, sans-serif; }
   h1, .screen h2, .title-ui h1 { font-weight: 800; letter-spacing: -.035em; }
   .title-ui h1 { letter-spacing: -.045em; line-height: .82; }
   .popup { font-weight: 800; letter-spacing: -.02em; }
@@ -221,7 +222,7 @@
     <h2 id="queueTitle"><span>to_do pile</span><span id="queueCount"></span></h2>
     <div id="well"></div>
     <div class="next"><i id="nextBar"></i></div>
-    <div class="hint">pressR to turn </div>
+    <div class="hint">press R to turn -- drag them into your calendar </div>
   </div>
 </main>
 
@@ -328,6 +329,20 @@ let calReturn = null;        // where to go when the calendar closes
 // They repeat every week, so a Tuesday class blocks every Tuesday in the game.
 let busy = {};
 const busyAt = (day, row) => busy[((TODAY + day) % 7) + ',' + row];
+
+// an example week, so first-time players can just press go
+// busy keys: "weekday,row"  weekday 0 = Sun … 6 = Sat,  row 0 = 9:00 … 9 = 18:00
+const EXAMPLE_TASKS = ['essay', 'reading', 'gym', 'group meeting', 'laundry', 'call home', 'project', 'groceries'];
+const EXAMPLE_BUSY = {
+  '1,1': 'class', '1,2': 'class',                     // Mon 10–12
+  '3,1': 'class', '3,2': 'class',                     // Wed 10–12
+  '2,4': 'studio', '2,5': 'studio', '2,6': 'studio',  // Tue 13–16
+  '4,4': 'studio', '4,5': 'studio', '4,6': 'studio',  // Thu 13–16
+  '5,5': 'work', '5,6': 'work', '5,7': 'work',        // Fri 14–17
+  '6,2': 'work', '6,3': 'work',                       // Sat 11–13
+};
+taskNames = [...EXAMPLE_TASKS];
+busy = { ...EXAMPLE_BUSY };
 
 // remember tasks + commitments between visits (if the browser allows it)
 try {
@@ -741,7 +756,7 @@ function showOverlay(html) { overlay.innerHTML = '<div class="screen">' + html +
 function showStart() {
   mode = 'start';
   showOverlay(`
-    <h2>plan your week</h2>/
+    <h2>plan this week</h2>
     <p>what are your plans for this week </p>
     <textarea id="taskInput" placeholder="${DEFAULT_TASKS.slice(0, 5).join('\n')}">${escapeHtml(taskNames.join('\n'))}</textarea>
 
@@ -749,6 +764,7 @@ function showStart() {
     <p class="small">drag to fill in</p>
     <div class="ed-tools">
       <span>name</span><input id="busyLabel" value="class" maxlength="14">
+      <button id="exampleBtn">example</button>
       <button id="clearBusy">clear</button>
     </div>
     <div class="editor" id="editor"></div>
@@ -756,7 +772,14 @@ function showStart() {
     <div class="buttons"><button id="startBtn">go</button></div>
   `);
   buildEditor();
-  document.getElementById('clearBusy').onclick = () => { busy = {}; refreshEditor(); };
+  document.getElementById('clearBusy').onclick = () => {
+    busy = {}; refreshEditor();
+    document.getElementById('taskInput').value = '';
+  };
+  document.getElementById('exampleBtn').onclick = () => {
+    busy = { ...EXAMPLE_BUSY }; refreshEditor();
+    document.getElementById('taskInput').value = EXAMPLE_TASKS.join('\n');
+  };
   document.getElementById('startBtn').onclick = () => {
     const lines = document.getElementById('taskInput').value.split('\n').map(s => s.trim()).filter(Boolean);
     taskNames = lines.length ? lines : DEFAULT_TASKS;
